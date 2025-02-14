@@ -12,8 +12,8 @@ def load_vocab(file_path='vocab.json'):
     with open(file_path, 'r') as file:
         return json.load(file)
 
-def select_subset_vocab(vocab, num_words=10):
-    return dict(random.sample(list(vocab.items()), min(num_words, len(vocab))))
+# def select_subset_vocab(vocab, num_words=10):
+#     return dict(random.sample(list(vocab.items()), min(num_words, len(vocab))))
 
 def create_story_agent():
     llm = ChatGroq(api_key=os.getenv("GROQ_API_KEY"))
