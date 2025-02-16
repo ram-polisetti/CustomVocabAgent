@@ -11,10 +11,10 @@ def main():
     story = generate_story(story_agent, vectorstore)
 
     print("Generated Story:")
-    print(story)
+    print(story.content)  # Access the content attribute
 
     with open('generated_story.txt', 'w', encoding='utf-8') as file:
-        file.write(story)
+        file.write(story.content)  # Write the content attribute
 
     print("\nStory has been saved to 'generated_story.txt'")
 
