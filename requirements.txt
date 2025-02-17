@@ -1,7 +1,8 @@
-langchain
+langchain == 0.3.14
 langchain-groq
 python-dotenv
 langchain-community
 chromadb
 sentence-transformers
 langchain_huggingface
+groq

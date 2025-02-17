@@ -1,3 +1,5 @@
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 from dotenv import load_dotenv
 import json
 from langchain_community.vectorstores import Chroma
@@ -6,15 +8,11 @@ from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from langchain_groq import ChatGroq
 
-import os
-from dotenv import load_dotenv
-
 load_dotenv()
 api_key = os.getenv("GROQ_API_KEY")
 print(f"API Key: {api_key[:5]}...{api_key[-5:]}")
 if not api_key:
     raise ValueError("GROQ_API_KEY not found in environment variables")
-
 
 def load_vocab(file_path='vocab.json'):
     with open(file_path, 'r') as file:
@@ -26,30 +24,70 @@ def load_vocab(file_path='vocab.json'):
 
 def create_story_agent():
     llm = ChatGroq(api_key=api_key)
-    prompt = PromptTemplate(
-        input_variables=["vocab"],
+    themed_prompt = PromptTemplate(
+        input_variables=["vocab", "theme"],
         template="""You have access to a custom vocabulary of invented words. Each word represents a unique concept, emotion, or action that doesn't exist in standard language. These words are NOT nouns and should not be used as names for people, places, or objects.
 
 Custom Vocabulary:
 {vocab}
 
-Create a short, engaging story that incorporates these words as descriptions of emotions, sensations, or actions. Use them to describe how characters feel or experience things in unique ways. Do not use these words as names or objects in the story.
+STRICT THEME REQUIREMENTS:
+{theme}
 
-For example, if a word is defined as "a feeling of excitement when making a mistake," you might write: "As she dropped the vase, she felt a surge of [custom word], an unexpected thrill at her error."
+IMPORTANT RULES:
+1. The story MUST take place exactly where specified in the theme
+2. The story MUST include ONLY the characters mentioned in the theme
+3. The story MUST focus on the exact actions mentioned in the theme
+4. DO NOT add any additional locations or characters
+5. DO NOT create a different story than what the theme specifies
+6. Use the custom vocabulary words ONLY to describe emotions, sensations, and actions
 
-Write your story now, creatively using these custom words to describe unique experiences and feelings:"""
+Example format:
+If theme is "a man vacuuming his house with a dog and brown tornado", the story must:
+- Be about a man vacuuming
+- Take place in his house
+- Include his dog
+- Include the brown tornado
+- Use custom words to describe feelings and sensations during these exact events
+
+Write your story now, strictly following the theme and using custom words to describe emotions and sensations:"""
     )
-    llm = ChatGroq(api_key=os.getenv("GROQ_API_KEY"))
-    chain = prompt | llm
+    chain = LLMChain(llm=llm, prompt=themed_prompt)
     return chain
-    # return LLMChain(llm=llm, prompt=prompt)
 
-# def generate_story(agent, vectorstore, query="Create a short story", num_words=10):
-#     relevant_vocab = vectorstore.similarity_search(query, k=num_words)
-#     vocab_text = "\n".join([doc.page_content for doc in relevant_vocab])
 
-#     return agent.run(vocab_text)
-def generate_story(agent, vectorstore, query="Create a short story", num_words=10):
-    relevant_vocab = vectorstore.similarity_search(query, k=num_words)
+def generate_story(agent, vectorstore, query="Create a short story", num_words=20):
+    # Create a more structured theme analysis
+    enhanced_query = f"""
+    Story Requirements:
+    Main Theme: {query}
+
+    Must Include:
+    - All characters mentioned in: {query}
+    - All actions and events from: {query}
+    - Exact setting from: {query}
+    - All key elements mentioned in: {query}
+
+    Story Elements to Consider:
+    - Emotions and sensations during the events
+    - Interactions between all mentioned characters
+    - Detailed description of the specific actions
+    - Atmosphere and environment of the setting
+    """
+
+    # Get relevant vocabulary based on the theme
+    relevant_vocab = vectorstore.similarity_search(enhanced_query, k=num_words)
     vocab_text = "\n".join([doc.page_content for doc in relevant_vocab])
-    return agent.invoke(vocab_text)
+
+    # Generate the story with the themed prompt
+    response = agent.invoke({
+        "vocab": vocab_text,
+        "theme": f"Write a story that MUST include all elements from: {query}. Do not deviate from the theme's characters, setting, or events."
+    })
+
+    # Create a response object with a content attribute
+    class StoryResponse:
+        def __init__(self, content):
+            self.content = content
+
+    return StoryResponse(response)
